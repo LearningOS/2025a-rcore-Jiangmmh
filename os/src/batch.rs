@@ -100,6 +100,7 @@ impl AppManager {
 }
 
 lazy_static! {
+    // APP_MANAGER的全局实例，从link_app.S中读取_num_app和用户程序的起始位置
     static ref APP_MANAGER: UPSafeCell<AppManager> = unsafe {
         UPSafeCell::new({
             extern "C" {
@@ -132,22 +133,34 @@ pub fn print_app_info() {
 
 /// run next app
 pub fn run_next_app() -> ! {
+    // 通过exclusive_access获取对APP_MANAGER的独占使用权
     let mut app_manager = APP_MANAGER.exclusive_access();
+
+    // 加载应用
     let current_app = app_manager.get_current_app();
+
+    // 将下一个要运行的应用程序加载到内存
     unsafe {
         app_manager.load_app(current_app);
     }
+
+    // 更新管理器中的索引，指向下一个待执行的程序
     app_manager.move_to_next_app();
+
+    // 释放对APP_MANAGER的独占锁
     drop(app_manager);
     // before this we have to drop local variables related to resources manually
     // and release the resources
     extern "C" {
         fn __restore(cx_addr: usize);
     }
+
+    // 通过KERNEL_STACK.push_context先将上下文状态压入栈中
+    // 然后使用__restore利用刚刚压入的信息从内核态跳转到用户态执行
     unsafe {
         __restore(KERNEL_STACK.push_context(TrapContext::app_init_context(
-            APP_BASE_ADDRESS,
-            USER_STACK.get_sp(),
+            APP_BASE_ADDRESS,           // 应用程序在内存中的起始地址
+            USER_STACK.get_sp(),        // 获取用户栈的栈顶指针
         )) as *const _ as usize);
     }
     panic!("Unreachable in batch::run_current_app!");
