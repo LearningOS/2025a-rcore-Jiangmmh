@@ -3,6 +3,7 @@
 use crate::sbi::shutdown;
 use core::panic::PanicInfo;
 
+// #[panic_handler]用于告知编译器，采用我们的panic实现
 #[panic_handler]
 /// panic handler
 fn panic(info: &PanicInfo) -> ! {

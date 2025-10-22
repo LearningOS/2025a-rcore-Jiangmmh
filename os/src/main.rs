@@ -25,6 +25,8 @@ mod sbi;
 #[path = "boards/qemu.rs"]
 mod board;
 
+// include_str!用于将entry.asm的内容转换为字符串
+// global_asm!用于将将entry.asm中的代码嵌入到本文件
 global_asm!(include_str!("entry.asm"));
 
 /// clear BSS segment
@@ -39,6 +41,7 @@ pub fn clear_bss() {
 /// the rust entry-point of os
 #[no_mangle]
 pub fn rust_main() -> ! {
+    // 将各代码段、数据段的起始和结束地址导入为变量
     extern "C" {
         fn stext(); // begin addr of text segment
         fn etext(); // end addr of text segment
@@ -53,7 +56,7 @@ pub fn rust_main() -> ! {
     }
     clear_bss();
     logging::init();
-    println!("[kernel] Hello, world!");
+    println!("{} [kernel] Hello, world!", "Minghan's");
 
     trace!(
         "[kernel] .text [{:#x}, {:#x})",
