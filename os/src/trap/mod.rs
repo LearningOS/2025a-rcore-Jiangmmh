@@ -31,6 +31,8 @@ pub fn init() {
         fn __alltraps();
     }
     unsafe {
+        // 将__alltraps写入CSR stvec中，在硬件完成相应处理后会跳转到此处执行
+        // Mod设置为Direct模式，即跳转地址就是传入的地址__alltraps
         stvec::write(__alltraps as usize, TrapMode::Direct);
     }
 }
@@ -42,7 +44,7 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
     let stval = stval::read(); // get extra value
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
-            cx.sepc += 4;
+            cx.sepc += 4;   // 让sepc指向ecall的下一条指令
             cx.x[10] = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]) as usize;
         }
         Trap::Exception(Exception::StoreFault) | Trap::Exception(Exception::StorePageFault) => {

@@ -5,7 +5,7 @@ pub struct TrapContext {
     /// general regs[0..31]
     pub x: [usize; 32],
     /// CSR sstatus      
-    pub sstatus: Sstatus,
+    pub sstatus: Sstatus,   // sstatus和sepc可能会被嵌套trap而修改，因此需要保存
     /// CSR sepc
     pub sepc: usize,
 }

@@ -1,5 +1,4 @@
 //! batch subsystem
-
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use core::arch::asm;
@@ -11,19 +10,22 @@ const MAX_APP_NUM: usize = 16;
 const APP_BASE_ADDRESS: usize = 0x80400000;
 const APP_SIZE_LIMIT: usize = 0x20000;
 
+// 定义内核栈结构体，包含一个固定长度为8KB的数组
 #[repr(align(4096))]
 struct KernelStack {
     data: [u8; KERNEL_STACK_SIZE],
 }
-
+// 定义用户栈结构体，包含一个固定长度为8KB的数组
 #[repr(align(4096))]
 struct UserStack {
     data: [u8; USER_STACK_SIZE],
 }
 
+// 声明一个静态内核栈，内容初始化为0
 static KERNEL_STACK: KernelStack = KernelStack {
     data: [0; KERNEL_STACK_SIZE],
 };
+// 声明一个静态用户栈，内容初始化为0
 static USER_STACK: UserStack = UserStack {
     data: [0; USER_STACK_SIZE],
 };
@@ -73,14 +75,16 @@ impl AppManager {
             crate::board::QEMU_EXIT_HANDLE.exit_success();
         }
         println!("[kernel] Loading app_{}", app_id);
-        // clear app area
+        // 清除从地址0x80400000开始的0x20000个字节，填入0
         core::slice::from_raw_parts_mut(APP_BASE_ADDRESS as *mut u8, APP_SIZE_LIMIT).fill(0);
+        // 取出第app_id个app的内容，存放到app_src中
         let app_src = core::slice::from_raw_parts(
             self.app_start[app_id] as *const u8,
             self.app_start[app_id + 1] - self.app_start[app_id],
         );
+        // 获取存放app的目标内存的可变引用
         let app_dst = core::slice::from_raw_parts_mut(APP_BASE_ADDRESS as *mut u8, app_src.len());
-        app_dst.copy_from_slice(app_src);
+        app_dst.copy_from_slice(app_src);   // 将app拷贝到目标内存位置
         // Memory fence about fetching the instruction memory
         // It is guaranteed that a subsequent instruction fetch must
         // observes all previous writes to the instruction memory.
@@ -109,9 +113,12 @@ lazy_static! {
             let num_app_ptr = _num_app as usize as *const usize;
             let num_app = num_app_ptr.read_volatile();
             let mut app_start: [usize; MAX_APP_NUM + 1] = [0; MAX_APP_NUM + 1];
+
+            // num_app_ptr指向num_app，下一个位置存放的是第一个app的地址
+            // 这里使用from_raw_parts取出了num_app个app的地址，存放到数组引用app_start_raw中
             let app_start_raw: &[usize] =
-                core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1);
-            app_start[..=num_app].copy_from_slice(app_start_raw);
+                core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1);  
+            app_start[..=num_app].copy_from_slice(app_start_raw); // 将各app的首地址拷贝到app_start中
             AppManager {
                 num_app,
                 current_app: 0,
