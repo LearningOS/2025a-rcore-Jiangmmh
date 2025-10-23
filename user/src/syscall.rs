@@ -68,13 +68,14 @@ pub fn syscall6(id: usize, args: [usize; 6]) -> isize {
     let mut ret: isize;
     unsafe {
         core::arch::asm!("ecall",
-            inlateout("x10") args[0] => ret,
+            // x10~x17对应a0~a7，用于存放参数
+            inlateout("x10") args[0] => ret, // a0既作为第一个参数，又在返回时存储返回值
             in("x11") args[1],
             in("x12") args[2],
             in("x13") args[3],
             in("x14") args[4],
             in("x15") args[5],
-            in("x17") id
+            in("x17") id        // a7存放系统调用号
         );
     }
     ret

@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(linkage)]
+#![feature(linkage)]             // 开启后支持链接操作
 #![feature(panic_info_message)]
 #![feature(alloc_error_handler)]
 
