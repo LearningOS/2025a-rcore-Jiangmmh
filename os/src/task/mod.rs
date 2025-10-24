@@ -52,8 +52,9 @@ lazy_static! {
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
         let mut tasks = [TaskControlBlock {
-            task_cx: TaskContext::zero_init(),
+            task_cx: TaskContext::zero_init(),  // zero_init就是全0
             task_status: TaskStatus::UnInit,
+            task_cnt_call: [0; 5],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -94,14 +95,14 @@ impl TaskManager {
     fn mark_current_suspended(&self) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        inner.tasks[current].task_status = TaskStatus::Ready;
+        inner.tasks[current].task_status = TaskStatus::Ready; // 将当前task设置为Redy
     }
 
     /// Change the status of current `Running` task into `Exited`.
     fn mark_current_exited(&self) {
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        inner.tasks[current].task_status = TaskStatus::Exited;
+        inner.tasks[current].task_status = TaskStatus::Exited; // 将当前task设置为Exited
     }
 
     /// Find next task to run and return task id.
@@ -110,7 +111,7 @@ impl TaskManager {
     fn find_next_task(&self) -> Option<usize> {
         let inner = self.inner.exclusive_access();
         let current = inner.current_task;
-        (current + 1..current + self.num_app + 1)
+        (current + 1..current + self.num_app + 1) // 向后循环查找第一个状态为Ready的task
             .map(|id| id % self.num_app)
             .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
     }
@@ -121,18 +122,44 @@ impl TaskManager {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
-            inner.tasks[next].task_status = TaskStatus::Running;
-            inner.current_task = next;
+            inner.tasks[next].task_status = TaskStatus::Running; // 将当前task设置为Running
+            inner.current_task = next; // 修改当前task为next
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
             let next_task_cx_ptr = &inner.tasks[next].task_cx as *const TaskContext;
-            drop(inner);
-            // before this, we should drop local variables that must be dropped manually
+            drop(inner); // 这里需要手动drop，否则会在再次切换到当前task，从__switch中退出时才会释放inner
+                         // before this, we should drop local variables that must be dropped manually
             unsafe {
-                __switch(current_task_cx_ptr, next_task_cx_ptr);
+                __switch(current_task_cx_ptr, next_task_cx_ptr); // 调用switch，完成任务切换
             }
             // go back to user mode
         } else {
             panic!("All applications completed!");
+        }
+    }
+
+    fn set_syscall_cnt(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        match syscall_id {
+            64 => inner.tasks[current].task_cnt_call[0] += 1,
+            93 => inner.tasks[current].task_cnt_call[1] += 1,
+            124 => inner.tasks[current].task_cnt_call[2] += 1,
+            169 => inner.tasks[current].task_cnt_call[3] += 1,
+            410 => inner.tasks[current].task_cnt_call[4] += 1,
+            _ => panic!("error"),
+        };
+    }
+
+    fn get_syscall_cnt(&self, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        match syscall_id {
+            64 => inner.tasks[current].task_cnt_call[0],
+            93 => inner.tasks[current].task_cnt_call[1],
+            124 => inner.tasks[current].task_cnt_call[2],
+            169 => inner.tasks[current].task_cnt_call[3],
+            410 => inner.tasks[current].task_cnt_call[4],
+            _ => panic!("error in "),
         }
     }
 }
@@ -168,4 +195,14 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// set syscall count for trace
+pub fn set_syscall_cnt(syscall_id: usize) {
+    TASK_MANAGER.set_syscall_cnt(syscall_id);
+}
+
+/// get syscall count for trace
+pub fn get_syscall_cnt(syscall_id: usize) -> usize{
+    TASK_MANAGER.get_syscall_cnt(syscall_id)
 }

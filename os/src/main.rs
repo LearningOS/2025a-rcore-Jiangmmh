@@ -95,13 +95,13 @@ fn kernel_log_info() {
 #[no_mangle]
 /// the rust entry-point of os
 pub fn rust_main() -> ! {
-    clear_bss();
-    kernel_log_info();
-    heap_alloc::init_heap();
-    trap::init();
-    loader::load_apps();
-    trap::enable_timer_interrupt();
-    timer::set_next_trigger();
-    task::run_first_task();
+    clear_bss();                            // 将.bss段中的内容清零
+    kernel_log_info();                      // 输出kernel各段的起始地址
+    heap_alloc::init_heap();                // 初始化内核的堆
+    trap::init();                           // 初始化trap，即将trap处理函数__alltraps的地址存入stvec
+    loader::load_apps();                    // 加载全部app到起始地址为0x80400000处
+    trap::enable_timer_interrupt();         // 操作Supervisor Interrupt Enable (SIE) 寄存器，启用时钟中断
+    timer::set_next_trigger();              // 设置下次时钟中断的时间
+    task::run_first_task();                 // 执行第一个任务
     panic!("Unreachable in rust_main!");
 }

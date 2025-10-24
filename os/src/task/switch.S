@@ -7,13 +7,16 @@
 .endm
     .section .text
     .globl __switch
+
+# 保存curren_task的上下文，恢复next_task的上下文
+# 在执行ret前，ra和sp指向的是next_task的返回指令地址和内核栈
 __switch:
     # __switch(
-    #     current_task_cx_ptr: *mut TaskContext,
-    #     next_task_cx_ptr: *const TaskContext
+    #     current_task_cx_ptr: *mut TaskContext,    该参数放在a0寄存器中
+    #     next_task_cx_ptr: *const TaskContext      该参数放在a1寄存器中
     # )
     # save kernel stack of current task
-    sd sp, 8(a0)
+    sd sp, 8(a0)   
     # save ra & s0~s11 of current execution
     sd ra, 0(a0)
     .set n, 0

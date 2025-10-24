@@ -7,7 +7,7 @@ pub struct TaskContext {
     /// Ret position after task switching
     ra: usize,
     /// Stack pointer
-    sp: usize,
+    sp: usize,          // 每个task都有一个内核栈
     /// s0-11 register, callee saved
     s: [usize; 12],
 }

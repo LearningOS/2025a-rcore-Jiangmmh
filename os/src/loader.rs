@@ -21,6 +21,7 @@ struct UserStack {
     data: [u8; USER_STACK_SIZE],
 }
 
+// 每个app对应一个task，每个task都有一个自己的内核栈和用户栈
 static KERNEL_STACK: [KernelStack; MAX_APP_NUM] = [KernelStack {
     data: [0; KERNEL_STACK_SIZE],
 }; MAX_APP_NUM];
@@ -65,10 +66,11 @@ pub fn get_num_app() -> usize {
 /// [APP_BASE_ADDRESS + n * APP_SIZE_LIMIT, APP_BASE_ADDRESS + (n+1) * APP_SIZE_LIMIT).
 pub fn load_apps() {
     extern "C" {
-        fn _num_app();
+        fn _num_app();      // 获取全局符号_num_app的地址
     }
     let num_app_ptr = _num_app as usize as *const usize;
     let num_app = get_num_app();
+    // app_start指向当前app的首地址
     let app_start = unsafe { core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1) };
     // load apps
     for i in 0..num_app {

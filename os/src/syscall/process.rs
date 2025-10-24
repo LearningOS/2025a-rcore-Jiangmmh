@@ -4,6 +4,8 @@ use crate::{
     timer::get_time_us,
 };
 
+use crate::task::get_syscall_cnt;
+
 #[repr(C)]
 #[derive(Debug)]
 pub struct TimeVal {
@@ -41,5 +43,17 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 // TODO: implement the syscall
 pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+    if _trace_request == 0 {
+        return unsafe {
+            (*(_id as *const u8)).into()
+        }
+    } else if _trace_request == 1 {
+        unsafe {
+            *(_id as *mut u8) = _data as u8;
+        }
+        return 0;
+    } else if _trace_request == 2 {
+        return get_syscall_cnt(_id) as isize;
+    }
+    return 0;
 }
