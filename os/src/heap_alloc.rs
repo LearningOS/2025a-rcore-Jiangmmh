@@ -7,6 +7,7 @@ use buddy_system_allocator::LockedHeap;
 /// heap allocator instance
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
+// 这个堆是静态的，在加载时存放在.bss段
 /// heap space ([u8; KERNEL_HEAP_SIZE])
 static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 

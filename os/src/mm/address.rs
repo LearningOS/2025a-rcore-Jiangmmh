@@ -1,16 +1,17 @@
 //! Implementation of physical and virtual address and page number.
 use super::PageTableEntry;
-use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
+use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS}; // 4KB, 12bits
 use core::fmt::{self, Debug, Formatter};
 /// physical address
-const PA_WIDTH_SV39: usize = 56;
-const VA_WIDTH_SV39: usize = 39;
-const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;
-const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
+const PA_WIDTH_SV39: usize = 56;                                // 物理地址长度 
+const VA_WIDTH_SV39: usize = 39;                                // 虚拟地址长度
+const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;   // 物理页号长度 44
+const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;   // 虚拟页号长度 27
 
+// 物理地址、虚拟地址、物理页号、虚拟页号，都是对usize的简单封装
 /// physical address
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub struct PhysAddr(pub usize);
+pub struct PhysAddr(pub usize); 
 /// virtual address
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VirtAddr(pub usize);
@@ -21,8 +22,8 @@ pub struct PhysPageNum(pub usize);
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct VirtPageNum(pub usize);
 
+// 实现 core::DEBUG trait，自定义 #? 的输出格式
 /// Debugging
-
 impl Debug for VirtAddr {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("VA:{:#x}", self.0))
@@ -159,9 +160,9 @@ impl From<PhysPageNum> for PhysAddr {
 impl VirtPageNum {
     /// Get the indexes of the page table entry
     pub fn indexes(&self) -> [usize; 3] {
-        let mut vpn = self.0;
-        let mut idx = [0usize; 3];
-        for i in (0..3).rev() {
+        let mut vpn = self.0;       // vpn有27位，分为三段，每段9位
+        let mut idx = [0usize; 3];  
+        for i in (0..3).rev() {     // 将三段vpn存入idx中 idx[0]=低9位
             idx[i] = vpn & 511;
             vpn >>= 9;
         }
@@ -178,19 +179,19 @@ impl PhysAddr {
 }
 impl PhysPageNum {
     /// Get the reference of page table(array of ptes)
-    pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
+    pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {  // 返回物理页号对应页表的PTE对象数组
         let pa: PhysAddr = (*self).into();
         unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut PageTableEntry, 512) }
     }
     /// Get the reference of page(array of bytes)
-    pub fn get_bytes_array(&self) -> &'static mut [u8] {
+    pub fn get_bytes_array(&self) -> &'static mut [u8] {            // 返回物理页号对应页表的字节数组
         let pa: PhysAddr = (*self).into();
         unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut u8, 4096) }
     }
     /// Get the mutable reference of physical address
     pub fn get_mut<T>(&self) -> &'static mut T {
-        let pa: PhysAddr = (*self).into();
-        pa.get_mut()
+        let pa: PhysAddr = (*self).into();          // 先将PhysPageNum转换为PhysAddr
+        pa.get_mut()                                // 再调用get_mut方法，将PhysAddr转换为usize，再转换为可变的指针
     }
 }
 

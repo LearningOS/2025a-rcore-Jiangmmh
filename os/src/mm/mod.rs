@@ -22,7 +22,7 @@ pub use page_table::{PTEFlags, PageTable};
 
 /// initiate heap allocator, frame allocator and kernel space
 pub fn init() {
-    heap_allocator::init_heap();
-    frame_allocator::init_frame_allocator();
-    KERNEL_SPACE.exclusive_access().activate();
+    heap_allocator::init_heap();                    // 初始化堆
+    frame_allocator::init_frame_allocator();        // 初始化帧分配器
+    KERNEL_SPACE.exclusive_access().activate();     // 激活地址空间
 }

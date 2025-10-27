@@ -29,6 +29,7 @@ use riscv::register::{
 
 global_asm!(include_str!("trap.S"));
 
+// 设置内核的trap handler
 /// Initialize trap handling
 pub fn init() {
     set_kernel_trap_entry();
@@ -56,7 +57,8 @@ pub fn enable_timer_interrupt() {
 /// trap handler
 #[no_mangle]
 pub fn trap_handler() -> ! {
-    set_kernel_trap_entry();
+    // 设置内核态发生trap时的处理函数（设置stvec），这里弱化了它，直接panic
+    set_kernel_trap_entry();    
     let cx = current_trap_cx();
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value
@@ -101,20 +103,22 @@ pub fn trap_handler() -> ! {
 /// set the reg a0 = trap_cx_ptr, reg a1 = phy addr of usr page table,
 /// finally, jump to new addr of __restore asm function
 pub fn trap_return() -> ! {
+    // 要返回用户态了，设置stvec为TRAMPOLINE（即__alltraps的地址）
     set_user_trap_entry();
     let trap_cx_ptr = TRAP_CONTEXT_BASE;
-    let user_satp = current_user_token();
+    let user_satp = current_user_token();       // 获取satp
     extern "C" {
         fn __alltraps();
         fn __restore();
     }
+    // __restore在TRAMPOLINE中的地址
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
     // trace!("[kernel] trap_return: ..before return");
     unsafe {
         asm!(
             "fence.i",
             "jr {restore_va}",         // jump to new addr of __restore asm function
-            restore_va = in(reg) restore_va,
+            restore_va = in(reg) restore_va,  
             in("a0") trap_cx_ptr,      // a0 = virt addr of Trap Context
             in("a1") user_satp,        // a1 = phy addr of usr page table
             options(noreturn)

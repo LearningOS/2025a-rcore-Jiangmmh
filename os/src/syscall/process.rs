@@ -1,5 +1,6 @@
 //! Process management syscalls
-use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, get_current_task};
+use crate::timer::{get_time_ms, get_time_us};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -27,6 +28,13 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
+
+    // 获取当前时间：秒和毫秒
+    let _time_s = get_time_ms() / 1000;
+    let _time_us = get_time_us();
+
+    // 将这两个时间写入_ts中
+    let _current_task = get_current_task();
     -1
 }
 

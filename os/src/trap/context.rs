@@ -34,7 +34,7 @@ impl TrapContext {
     ) -> Self {
         let mut sstatus = sstatus::read();
         // set CPU privilege to User after trapping back
-        sstatus.set_spp(SPP::User);
+        sstatus.set_spp(SPP::User); // 返回时将sstatus中的SSP字段设置为用户特权级
         let mut cx = Self {
             x: [0; 32],
             sstatus,

@@ -7,6 +7,7 @@ use crate::mm::{
 use crate::trap::{trap_handler, TrapContext};
 
 /// The task control block (TCB) of a task.
+#[derive(Clone)]
 pub struct TaskControlBlock {
     /// Save task context
     pub task_cx: TaskContext,
@@ -42,13 +43,14 @@ impl TaskControlBlock {
     /// Based on the elf info in program, build the contents of task in a new address space
     pub fn new(elf_data: &[u8], app_id: usize) -> Self {
         // memory_set with elf program headers/trampoline/trap context/user stack
-        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
+        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);  // 传入elf格式数据，构造地址空间
         let trap_cx_ppn = memory_set
-            .translate(VirtAddr::from(TRAP_CONTEXT_BASE).into())
+            .translate(VirtAddr::from(TRAP_CONTEXT_BASE).into())    // 应用TrapContex上下文，地址空间次高页面
             .unwrap()
             .ppn();
         let task_status = TaskStatus::Ready;
         // map a kernel-stack in kernel space
+        // 获取app对应的内核栈（在Trampoline下面）
         let (kernel_stack_bottom, kernel_stack_top) = kernel_stack_position(app_id);
         KERNEL_SPACE.exclusive_access().insert_framed_area(
             kernel_stack_bottom.into(),
@@ -82,6 +84,7 @@ impl TaskControlBlock {
         if new_brk < self.heap_bottom as isize {
             return None;
         }
+
         let result = if size < 0 {
             self.memory_set
                 .shrink_to(VirtAddr(self.heap_bottom), VirtAddr(new_brk as usize))

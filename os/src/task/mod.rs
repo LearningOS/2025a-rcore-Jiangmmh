@@ -202,3 +202,26 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
 }
+
+
+/// Get current TaskControlBlock
+pub fn get_current_task() -> TaskControlBlock {
+    // 1. 访问 TaskManager 的内部数据，并获取独占锁（exclusive_access）
+    // exclusive_access() 返回一个实现了 DerefMut 的 Guard，
+    // 锁在 Guard 离开作用域时（即本函数结束时）自动释放。
+    let task_manager_inner_guard = TASK_MANAGER.inner.exclusive_access();
+
+    // 2. 从 TaskManagerInner 中读取当前任务的 ID
+    let current_task_id = task_manager_inner_guard.current_task;
+
+    // 3. 根据 ID 从任务列表中取出 TCB 实例
+    // TaskControlBlock 必须是 Arc<...> 类型，才能在不移动所有权的情况下克隆（增加引用计数）。
+    let current_tcb = task_manager_inner_guard.tasks[current_task_id].clone();
+    
+    // 4. 显式地让 Guard 离开作用域 (可选，但推荐)
+    // 显式丢弃 Guard，释放任务管理器的锁
+    drop(task_manager_inner_guard);
+
+    // 5. 返回 TCB 的克隆引用
+    current_tcb
+}

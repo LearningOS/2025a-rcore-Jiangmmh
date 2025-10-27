@@ -28,15 +28,17 @@ extern "C" {
     fn strampoline();
 }
 
+// 创建并初始化内核地址空间
 lazy_static! {
     /// The kernel's initial memory mapping(kernel address space)
     pub static ref KERNEL_SPACE: Arc<UPSafeCell<MemorySet>> =
         Arc::new(unsafe { UPSafeCell::new(MemorySet::new_kernel()) });
 }
 /// address space
-pub struct MemorySet {
-    page_table: PageTable,
-    areas: Vec<MapArea>,
+#[derive(Clone)]
+pub struct MemorySet {          // 一个完整的、私有的地址空间
+    page_table: PageTable,      // 多级页表
+    areas: Vec<MapArea>,        // 该地址空间对应的段（代码、数据、堆、栈等）
 }
 
 impl MemorySet {
@@ -63,7 +65,8 @@ impl MemorySet {
             None,
         );
     }
-    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
+    // 向地址空间插入新的逻辑段
+    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {  
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data);
@@ -79,10 +82,10 @@ impl MemorySet {
         );
     }
     /// Without kernel stacks.
-    pub fn new_kernel() -> Self {
+    pub fn new_kernel() -> Self {               // 生成内核的地址空间
         let mut memory_set = Self::new_bare();
         // map trampoline
-        memory_set.map_trampoline();
+        memory_set.map_trampoline();            // 在内核地址空间中完成跳板的映射
         // map kernel sections
         info!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
         info!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
@@ -92,7 +95,7 @@ impl MemorySet {
             sbss_with_stack as usize, ebss as usize
         );
         info!("mapping .text section");
-        memory_set.push(
+        memory_set.push(        // 代码段，可读可执行
             MapArea::new(
                 (stext as usize).into(),
                 (etext as usize).into(),
@@ -102,7 +105,7 @@ impl MemorySet {
             None,
         );
         info!("mapping .rodata section");
-        memory_set.push(
+        memory_set.push(        // 只读数据段，只读
             MapArea::new(
                 (srodata as usize).into(),
                 (erodata as usize).into(),
@@ -112,7 +115,7 @@ impl MemorySet {
             None,
         );
         info!("mapping .data section");
-        memory_set.push(
+        memory_set.push(        // 数据段，可读可写
             MapArea::new(
                 (sdata as usize).into(),
                 (edata as usize).into(),
@@ -122,7 +125,7 @@ impl MemorySet {
             None,
         );
         info!("mapping .bss section");
-        memory_set.push(
+        memory_set.push(        // 未初始化的数据段，可读可写
             MapArea::new(
                 (sbss_with_stack as usize).into(),
                 (ebss as usize).into(),
@@ -132,7 +135,7 @@ impl MemorySet {
             None,
         );
         info!("mapping physical memory");
-        memory_set.push(
+        memory_set.push(        // 内核之外的可用数据段，可读可写
             MapArea::new(
                 (ekernel as usize).into(),
                 MEMORY_END.into(),
@@ -145,10 +148,10 @@ impl MemorySet {
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp_base and entry point.
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
+    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {  // 分析ELF文件格式的内容，解析其中的段，并生成地址空间
         let mut memory_set = Self::new_bare();
         // map trampoline
-        memory_set.map_trampoline();
+        memory_set.map_trampoline();            // 在用户地址空间中完成跳板的映射
         // map program headers of elf, with U flag
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -223,10 +226,11 @@ impl MemorySet {
     }
     /// Change page table by writing satp CSR Register.
     pub fn activate(&self) {
+        // 设置CSR satp，将当前地址空间的根页目录表设置为默认页目录表
         let satp = self.page_table.token();
         unsafe {
             satp::write(satp);
-            asm!("sfence.vma");
+            asm!("sfence.vma");     // 刷新TLB
         }
     }
     /// Translate a virtual page number to a page table entry
@@ -264,11 +268,12 @@ impl MemorySet {
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory
-pub struct MapArea {
-    vpn_range: VPNRange,
-    data_frames: BTreeMap<VirtPageNum, FrameTracker>,
-    map_type: MapType,
-    map_perm: MapPermission,
+pub struct MapArea {            // 代表 MemorySet 中的一个连续的、具有相同属性的内存段，例如代码段、数据段、堆或栈。
+                                // MapArea 是描述虚拟内存区域的基本单位
+    vpn_range: VPNRange,                                // 该段的虚拟地址区间
+    data_frames: BTreeMap<VirtPageNum, FrameTracker>,   // 从虚拟页号到物理页号的映射，
+    map_type: MapType,                                  // 映射类型，恒等映射（内核） or 帧映射（用户程序）
+    map_perm: MapPermission,                            // 该段的PTE权限标志
 }
 
 impl MapArea {
@@ -294,7 +299,7 @@ impl MapArea {
                 ppn = PhysPageNum(vpn.0);
             }
             MapType::Framed => {
-                let frame = frame_alloc().unwrap();
+                let frame = frame_alloc().unwrap(); // 分配一个物理页号
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }
@@ -380,7 +385,7 @@ bitflags! {
 }
 
 /// Return (bottom, top) of a kernel stack in kernel space.
-pub fn kernel_stack_position(app_id: usize) -> (usize, usize) {
+pub fn kernel_stack_position(app_id: usize) -> (usize, usize) {         // 内核地址空间的Trampoline下面存放的是各app的内核栈
     let top = TRAMPOLINE - app_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
     let bottom = top - KERNEL_STACK_SIZE;
     (bottom, top)

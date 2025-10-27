@@ -32,16 +32,16 @@ __alltraps:
     csrr t2, sscratch
     sd t2, 2*8(sp)
     # load kernel_satp into t0
-    ld t0, 34*8(sp)
+    ld t0, 34*8(sp)                 # 读取kernel地址空间的token
     # load trap_handler into t1
-    ld t1, 36*8(sp)
+    ld t1, 36*8(sp)                 # 读取trap handler在内核地址空间中的位置
     # move to kernel_sp
-    ld sp, 35*8(sp)
+    ld sp, 35*8(sp)                 # 读取应用对应内核栈的栈顶指针
     # switch to kernel space
-    csrw satp, t0
-    sfence.vma
+    csrw satp, t0                   # 切换地址空间
+    sfence.vma                      # 刷新TLB
     # jump to trap_handler
-    jr t1
+    jr t1                           # 跳转到trap handler
 
 __restore:
     # a0: *TrapContext in user space(Constant); a1: user space token

@@ -2,24 +2,29 @@
 use crate::config::KERNEL_HEAP_SIZE;
 use buddy_system_allocator::LockedHeap;
 
+// 下面这行用于声明整个程序默认使用的堆内存分配器
 #[global_allocator]
 /// heap allocator instance
 static HEAP_ALLOCATOR: LockedHeap = LockedHeap::empty();
 
+// 定义当内存分配失败时程序应该执行的行为
 #[alloc_error_handler]
 /// panic when heap allocation error occurs
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
     panic!("Heap allocation error, layout = {:?}", layout);
 }
+
 /// heap space ([u8; KERNEL_HEAP_SIZE])
-static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
+static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE]; // 为内核堆分配空间
+
 /// initiate heap allocator
 pub fn init_heap() {
     unsafe {
-        HEAP_ALLOCATOR
+        HEAP_ALLOCATOR      // 该分配器有一个mutex来保护内存安全
             .lock()
             .init(HEAP_SPACE.as_ptr() as usize, KERNEL_HEAP_SIZE);
     }
+    // heap_test();
 }
 
 #[allow(unused)]
